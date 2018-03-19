@@ -365,6 +365,16 @@ func TestConstructRecursiveQuery(t *testing.T) {
 			t.Errorf("\ngot err:  %q\nwant err: %q\n", err, expect)
 		}
 	})
+	t.Run("if configured, recursive types work fine", func(t *testing.T) {
+		type Recurser struct {
+			Children []Recurser `graphql-recurse:"2"`
+		}
+		got := query(Recurser{})
+		want := `{children{children{}}}`
+		if got != want {
+			t.Errorf("\ngot:  %q\nwant: %q\n", got, want)
+		}
+	})
 }
 
 func gatherPanic(fn func()) (err error) {
