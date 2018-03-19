@@ -329,7 +329,7 @@ func TestConstructRecursiveQuery(t *testing.T) {
 			Children []Recurser
 		}
 		err := gatherPanic(func() {
-			got := query(Recurser{})
+			got := GenerateQueryFields(Recurser{})
 			if got != "" {
 				t.Errorf("\ngot:  %q\nwant: an error!\n", got)
 			}
@@ -355,7 +355,7 @@ func TestConstructRecursiveQuery(t *testing.T) {
 			LeafD    string
 		}
 		err := gatherPanic(func() {
-			got := query(Parent{})
+			got := GenerateQueryFields(Parent{})
 			if got != "" {
 				t.Errorf("\ngot:  %q\nwant: an error!\n", got)
 			}
@@ -369,7 +369,7 @@ func TestConstructRecursiveQuery(t *testing.T) {
 		type Recurser struct {
 			Children []Recurser `graphql-recurse:"2"`
 		}
-		got := query(Recurser{})
+		got := GenerateQueryFields(Recurser{})
 		want := `{children{children{}}}`
 		if got != want {
 			t.Errorf("\ngot:  %q\nwant: %q\n", got, want)
