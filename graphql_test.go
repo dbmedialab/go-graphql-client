@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/shurcooL/graphql"
+	"github.com/dbmedialab/go-graphql-client"
 )
 
 func TestClient_Query_partialResultWithErrorResponse(t *testing.T) {

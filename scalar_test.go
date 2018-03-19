@@ -3,7 +3,7 @@ package graphql_test
 import (
 	"testing"
 
-	"github.com/shurcooL/graphql"
+	"github.com/dbmedialab/go-graphql-client"
 )
 
 func TestNewScalars(t *testing.T) {
