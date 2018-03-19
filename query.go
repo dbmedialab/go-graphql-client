@@ -3,9 +3,11 @@ package graphql
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/dbmedialab/go-graphql-client/ident"
 )
@@ -88,16 +90,23 @@ func writeArgumentType(w io.Writer, t reflect.Type, value bool) {
 // E.g., struct{Foo Int, BarBaz *Boolean} -> "{foo,barBaz}".
 func query(v interface{}) string {
 	var buf bytes.Buffer
-	writeQuery(&buf, reflect.TypeOf(v), false)
+	writeQuery(&buf, reflect.TypeOf(v), map[edge]int{}, []string{}, false)
 	return buf.String()
+}
+
+// edge is simply a tuple to key the visitation map that we use to keep
+// writeQuery from recursing without bound on recursive types.
+type edge struct {
+	t  reflect.Type
+	fn int
 }
 
 // writeQuery writes a minified query for t to w.
 // If inline is true, the struct fields of t are inlined into parent struct.
-func writeQuery(w io.Writer, t reflect.Type, inline bool) {
+func writeQuery(w io.Writer, t reflect.Type, visited map[edge]int, visitPath []string, inline bool) {
 	switch t.Kind() {
 	case reflect.Ptr, reflect.Slice:
-		writeQuery(w, t.Elem(), false)
+		writeQuery(w, t.Elem(), visited, visitPath, false)
 	case reflect.Struct:
 		// If the type implements json.Unmarshaler, it's a scalar. Don't expand it.
 		if reflect.PtrTo(t).Implements(jsonUnmarshaler) {
@@ -111,6 +120,15 @@ func writeQuery(w io.Writer, t reflect.Type, inline bool) {
 				io.WriteString(w, ",")
 			}
 			f := t.Field(i)
+
+			// Check how many times we've traversed this before (recursion limit).
+			edge := edge{t, i}
+			visited[edge]++
+			if visited[edge] > 1 {
+				visitPath = append(visitPath, t.Name())
+				panic(fmt.Errorf("cycle found: %s", strings.Join(visitPath, "->")))
+			}
+
 			value, ok := f.Tag.Lookup("graphql")
 			inlineField := f.Anonymous && !ok
 			if !inlineField {
@@ -120,7 +138,10 @@ func writeQuery(w io.Writer, t reflect.Type, inline bool) {
 					io.WriteString(w, ident.ParseMixedCaps(f.Name).ToLowerCamelCase())
 				}
 			}
-			writeQuery(w, f.Type, inlineField)
+			visitPath = append(visitPath, t.String()+"."+f.Name)
+			writeQuery(w, f.Type, visited, visitPath, inlineField)
+			visitPath = visitPath[:len(visitPath)-1]
+			visited[edge]--
 		}
 		if !inline {
 			io.WriteString(w, "}")

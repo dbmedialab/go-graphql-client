@@ -1,6 +1,7 @@
 package graphql
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 	"time"
@@ -320,6 +321,66 @@ func TestQueryArguments(t *testing.T) {
 			t.Errorf("test case %d:\n got: %q\nwant: %q", i, got, tc.want)
 		}
 	}
+}
+
+func TestConstructRecursiveQuery(t *testing.T) {
+	t.Run("recursive types should panic", func(t *testing.T) {
+		type Recurser struct {
+			Children []Recurser
+		}
+		err := gatherPanic(func() {
+			got := query(Recurser{})
+			if got != "" {
+				t.Errorf("\ngot:  %q\nwant: an error!\n", got)
+			}
+		})
+		expect := fmt.Errorf("cycle found: graphql.Recurser.Children->Recurser")
+		if err.Error() != expect.Error() {
+			t.Errorf("\ngot err:  %q\nwant err: %q\n", err, expect)
+		}
+	})
+	t.Run("deeper recursions should panic with helpful path info", func(t *testing.T) {
+		// A nested anonymous struct is used because function-local types require
+		// defining *in order*, so we can't make multi-step recursions out of them.
+		type Recurser struct {
+			LeafB    string
+			Children []struct {
+				Cycle Recurser
+			}
+			LeafC string
+		}
+		type Parent struct {
+			LeafA    string
+			Children []Recurser
+			LeafD    string
+		}
+		err := gatherPanic(func() {
+			got := query(Parent{})
+			if got != "" {
+				t.Errorf("\ngot:  %q\nwant: an error!\n", got)
+			}
+		})
+		expect := fmt.Errorf("cycle found: graphql.Parent.Children->graphql.Recurser.Children->struct { Cycle graphql.Recurser }.Cycle->Recurser")
+		if err.Error() != expect.Error() {
+			t.Errorf("\ngot err:  %q\nwant err: %q\n", err, expect)
+		}
+	})
+}
+
+func gatherPanic(fn func()) (err error) {
+	defer func() {
+		rcvr := recover()
+		switch e := rcvr.(type) {
+		case nil:
+			err = nil
+		case error:
+			err = e
+		default:
+			err = fmt.Errorf("non-error panic: %v", e)
+		}
+	}()
+	fn()
+	return
 }
 
 // Custom GraphQL types for testing.
