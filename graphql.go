@@ -1,21 +1,15 @@
 package graphql
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
-
-	"github.com/shurcooL/go/ctxhttp"
 
 	"github.com/dbmedialab/go-graphql-client/internal/jsonutil"
 )
 
 // Client is a GraphQL client.
 type Client struct {
-	url        string // GraphQL server URL.
-	httpClient *http.Client
+	transport Transport
 }
 
 // NewClient creates a GraphQL client targeting the specified GraphQL server URL.
@@ -25,8 +19,20 @@ func NewClient(url string, httpClient *http.Client) *Client {
 		httpClient = http.DefaultClient
 	}
 	return &Client{
-		url:        url,
-		httpClient: httpClient,
+		transport: TransportHTTP{
+			URL:        url,
+			HTTPClient: httpClient,
+		},
+	}
+}
+
+// NewPluggableClient creates a GraphQL client using the transport implementation given.
+// This is like NewClient, but can support any implementation, rather than just http.
+// (This may also be useful for testing -- you can provide a transport which uses
+// fixture data on the filesystem, for example!)
+func NewPluggableClient(transport Transport) *Client {
+	return &Client{
+		transport: transport,
 	}
 }
 
@@ -62,35 +68,12 @@ func (c *Client) MutateCustom(ctx context.Context, m interface{}, query string, 
 
 // do executes a single GraphQL operation.
 func (c *Client) do(ctx context.Context, v interface{}, query string, variables map[string]interface{}) error {
-	in := struct {
-		Query     string                 `json:"query"`
-		Variables map[string]interface{} `json:"variables,omitempty"`
-	}{
+	in := Request{
 		Query:     query,
 		Variables: variables,
 	}
-	var buf bytes.Buffer
-	err := json.NewEncoder(&buf).Encode(in)
-	if err != nil {
-		return err
-	}
-	resp, err := ctxhttp.Post(ctx, c.httpClient, c.url, "application/json", &buf)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status: %v", resp.Status)
-	}
-	var out struct {
-		Data   json.RawMessage
-		Errors errors
-		//Extensions interface{} // Unused.
-	}
-	err = json.NewDecoder(resp.Body).Decode(&out)
-	if err != nil {
-		return err
-	}
+
+	out, err := c.transport.Do(ctx, in)
 	err = jsonutil.UnmarshalGraphQL(out.Data, v)
 	if err != nil {
 		return err
