@@ -56,6 +56,9 @@ type TransportHTTP struct {
 }
 
 func (t TransportHTTP) Do(ctx context.Context, req Request) (*Response, error) {
+	if t.HTTPClient == nil {
+		t.HTTPClient = http.DefaultClient
+	}
 	var buf bytes.Buffer
 	err := json.NewEncoder(&buf).Encode(req)
 	if err != nil {

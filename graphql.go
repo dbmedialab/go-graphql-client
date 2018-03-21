@@ -15,9 +15,6 @@ type Client struct {
 // NewClient creates a GraphQL client targeting the specified GraphQL server URL.
 // If httpClient is nil, then http.DefaultClient is used.
 func NewClient(url string, httpClient *http.Client) *Client {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
 	return &Client{
 		transport: TransportHTTP{
 			URL:        url,
