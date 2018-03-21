@@ -74,6 +74,9 @@ func (c *Client) do(ctx context.Context, v interface{}, query string, variables 
 	}
 
 	out, err := c.transport.Do(ctx, in)
+	if err != nil {
+		return err
+	}
 	err = jsonutil.UnmarshalGraphQL(out.Data, v)
 	if err != nil {
 		return err
