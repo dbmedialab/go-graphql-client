@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/shurcooL/go/ctxhttp"
+	"golang.org/x/net/context/ctxhttp"
 )
 
 // Transport is an interface that can be implemented to replace the
